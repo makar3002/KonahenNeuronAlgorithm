@@ -8,11 +8,18 @@ from matplotlib import pyplot as plt
 class KonahenNeuron:
 	# Коэффициент альфа по-умолчанию, соответствует значению 50/100.
 	default_speed = 0.5
+	# Минимальное значение веса синапса.
+	min_synapse_weight = 0.01
+	# Максимальное значение веса синапса.
+	max_synapse_weight = 0.25
 
 	# Конструктор.
 	def __init__(self, synapse_count):
 		# Инициализация весов входных синапсов нейрона (случайные значения от 0 до 1).
-		self.synapse_weight_list = list(random.random() for x in range(0, synapse_count))
+		self.synapse_weight_list = list(
+			self.min_synapse_weight + random.random() * (self.max_synapse_weight - self.min_synapse_weight)
+			for x in range(0, synapse_count)
+		)
 		self.speed = self.default_speed
 
 
@@ -34,18 +41,18 @@ class KonahenClusteringAlgorithm:
 		# Выполняет 10000 эпох.
 		for x in range(0, 10000):
 			for i in range(0, len(training_set)):
-				random_coordinate = training_set[int(random.random() * len(training_set))]
+				random_coordinate_data = training_set[int(random.random() * len(training_set))]
 				# -1 - это индекс последнего слоя.
-				self.__learn_layer([random_coordinate.x, random_coordinate.y], -1)
+				self.__learn_layer(random_coordinate_data, -1)
 
 	# Определяет кластер координаты.
 	# Выбрасывает исключение, если конфигурация объекта не подходит для работы с координатами.
-	def get_coordinate_cluster(self, coordinate):
+	def get_coordinate_cluster(self, coordinate_data):
 		if self.input_count != 2:
 			raise Exception()
 
 		# -1 - это индекс последнего слоя.
-		neuron_index = self.__get_neuron_winner_index([coordinate.x, coordinate.y], -1)
+		neuron_index = self.__get_neuron_winner_index(coordinate_data, -1)
 		return neuron_index
 
 	# Обучает слой согласно переданным значениям и номеру слоя.
@@ -116,6 +123,25 @@ class KonahenClusteringAlgorithm:
 
 		return layer_list
 
+	# Номрализует и возвращает массив с данными координат.
+	def normalize_coordinates_data(self, coordinate_set):
+		x_sum = 0
+		y_sum = 0
+		for coordinate_index in range(0, len(coordinate_set)):
+			coordinate = coordinate_set[coordinate_index]
+			x_sum += coordinate.x ** 2
+			y_sum += coordinate.y ** 2
+
+		x_normal_value = math.sqrt(x_sum)
+		y_normal_value = math.sqrt(y_sum)
+
+		data_list = list()
+		for coordinate_index in range(0, len(coordinate_set)):
+			coordinate = coordinate_set[coordinate_index]
+			data_list.append([coordinate.x / x_normal_value, coordinate.y / y_normal_value])
+
+		return data_list
+
 
 # Класс для координаты.
 class Coordinate:
@@ -129,7 +155,7 @@ class Coordinate:
 # будут поделены на два кластера (соответствуют конфигу с одним слоем (выходным) из двух нейронов).
 neuron_algorithm = KonahenClusteringAlgorithm([2], 2)
 # Инициализация координат, вокруг которых формируются координаты для тренировочного датасета.
-dots_set = [Coordinate(0, 0), Coordinate(10, 10)]
+dots_set = [Coordinate(10, 10), Coordinate(20, 20)]
 training_set = list()
 
 # Формирование тренировочного датасета.
@@ -145,13 +171,15 @@ for i in range(0, 30):
 		y = length * math.sin(angle) + center_coordinate.y
 		training_set.append(Coordinate(x, y))
 
+normalized_training_set = neuron_algorithm.normalize_coordinates_data(training_set)
 # Обучение нейронной сети на третировочном датасете.
-neuron_algorithm.learn_by_coordinates(training_set)
+neuron_algorithm.learn_by_coordinates(normalized_training_set)
 
 # Изображение координат на плоскости с цветом, соответствующим номеру кластера.
-for coordinate_index in range(0, len(training_set)):
+for coordinate_index in range(0, len(normalized_training_set)):
 	coordinate = training_set[coordinate_index]
-	if neuron_algorithm.get_coordinate_cluster(coordinate):
+	normalized_coordinate_data = normalized_training_set[coordinate_index]
+	if neuron_algorithm.get_coordinate_cluster(normalized_coordinate_data):
 		# Если кластер не 0, то координата будет зеленого цвета.
 		settings = 'go'
 	else:
